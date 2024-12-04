@@ -3,6 +3,8 @@ import json
 from sqlalchemy.orm import sessionmaker
 from models import create_tables, Publisher, Book, Shop, Stock, Sale
 import os.path
+from dotenv import load_dotenv
+
 
 dotenv_config =  "config.env"
 if os.path.exists(dotenv_config):
@@ -17,8 +19,6 @@ engine = sqlalchemy.create_engine(DSN)
 
 create_tables(engine)
 
-client_input = input("Введите имя автора: ")
-true_input = f"%{client_input}%"
 
 Session = sessionmaker(bind=engine)
 session = Session()
@@ -37,9 +37,23 @@ for record in json_data:
     session.add(model(id=record.get('pk'), **record.get('fields')))
 session.commit()
 
-for c in (session.query(Book.title, Shop.name, Sale.price, Sale.date_sale).join(Publisher).join(Stock)
-        .join(Shop).join(Sale).filter(Publisher.name.like(true_input)).all()):
-    print(c[0],"|", c[1],"|", c[2],"|", c[3])
+def get_shops(client_input):
+    find_publisher = session.query(
+        Book.title, Shop.name, Sale.price, Sale.date_sale
+    ).select_from(Shop).\
+        join(Stock).\
+        join(Book).\
+        join(Publisher).\
+        join(Sale)
+    if client_input.isdigit():
+        result_search = find_publisher.filter(client_input == Publisher.id).all()
+    else:
+        result_search = find_publisher.filter(client_input == Publisher.name).all()
+    for title, name, price, date_sale in result_search:
+        print(f"{title} | {name} | {price} | {date_sale.strftime('%d-%m-%Y')}")
+    session.close()
 
 
-session.close()
+if __name__ == '__main__':
+    client_input = input("Введите имя или id автора: ")
+    get_shops(client_input)
